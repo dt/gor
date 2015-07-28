@@ -15,6 +15,7 @@ type DiffReporter struct {
 
 	ignoreErrors bool
 
+	outQueue       chan []byte
 	requestsWriter io.Writer
 }
 
@@ -24,10 +25,19 @@ func NewDiffReporter(config *HTTPOutputConfig) (d *DiffReporter) {
 	r.ignoreErrors = config.diffIgnoreErrors
 
 	if config.diffRequestsFile != "" {
+		r.outQueue = make(chan []byte, 100)
 		r.requestsWriter = NewFileOutput(config.diffRequestsFile)
+		go r.writeDiffs()
 	}
 
 	return r
+}
+
+func (d *DiffReporter) writeDiffs() {
+	for {
+		req := <-d.outQueue
+		d.requestsWriter.Write(req)
+	}
 }
 
 func (d *DiffReporter) ResponseAnalyze(client *HTTPClient, req, resp []byte, rtt int64, err error) {
@@ -48,12 +58,12 @@ func (d *DiffReporter) ResponseAnalyze(client *HTTPClient, req, resp []byte, rtt
 		return
 	}
 
-	if d.ignoreErrors && diffErr != nil {
-		return
-	}
-
-	if !d.ignoreErrors {
-		log.Println("[DIFF] diffhost error:\n", diffErr)
+	if diffErr != nil {
+		if d.ignoreErrors {
+			return
+		} else {
+			log.Println("[DIFF] diffhost error:\n", diffErr)
+		}
 	}
 
 	diffRtt := RttDurationToMs(stop.Sub(start))
@@ -81,7 +91,7 @@ func (d *DiffReporter) ResponseAnalyze(client *HTTPClient, req, resp []byte, rtt
 	)
 
 	if d.requestsWriter != nil {
-		d.requestsWriter.Write(req)
+		d.outQueue <- req
 	}
 
 }
