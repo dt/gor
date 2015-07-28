@@ -18,6 +18,10 @@ type HTTPOutputConfig struct {
 
 	elasticSearch string
 
+	diffHost         string
+	diffRequestsFile string
+	diffIgnoreErrors bool
+
 	Debug bool
 }
 
@@ -37,6 +41,8 @@ type HTTPOutput struct {
 	needWorker chan int
 
 	config *HTTPOutputConfig
+
+	diffReporter *DiffReporter
 
 	queueStats *GorStat
 
@@ -72,6 +78,10 @@ func NewHTTPOutput(address string, config *HTTPOutputConfig) io.Writer {
 		o.elasticSearch.Init(o.config.elasticSearch)
 	}
 
+	if o.config.diffHost != "" {
+		o.diffReporter = NewDiffReporter(o.config)
+	}
+
 	go o.workerMaster()
 
 	return o
@@ -97,6 +107,14 @@ func (o *HTTPOutput) startWorker() {
 		Debug:           o.config.Debug,
 	})
 
+	var diffClient *HTTPClient
+	if o.diffReporter != nil {
+		diffClient = NewHTTPClient(o.config.diffHost, &HTTPClientConfig{
+			FollowRedirects: o.config.redirectLimit,
+			Debug:           o.config.Debug,
+		})
+	}
+
 	deathCount := 0
 
 	atomic.AddInt64(&o.activeWorkers, 1)
@@ -104,7 +122,7 @@ func (o *HTTPOutput) startWorker() {
 	for {
 		select {
 		case data := <-o.queue:
-			o.sendRequest(client, data)
+			o.sendRequest(client, data, diffClient)
 			deathCount = 0
 		case <-time.After(time.Millisecond * 100):
 			// When dynamic scaling enabled workers die after 2s of inactivity
@@ -148,17 +166,22 @@ func (o *HTTPOutput) Write(data []byte) (n int, err error) {
 	return len(data), nil
 }
 
-func (o *HTTPOutput) sendRequest(client *HTTPClient, request []byte) {
+func (o *HTTPOutput) sendRequest(client *HTTPClient, request []byte, diffClient *HTTPClient) {
 	start := time.Now()
 	resp, err := client.Send(request)
 	stop := time.Now()
+	rtt := RttDurationToMs(stop.Sub(start))
 
 	if err != nil {
 		log.Println("Request error:", err)
 	}
 
 	if o.elasticSearch != nil {
-		o.elasticSearch.ResponseAnalyze(request, resp, start, stop)
+		o.elasticSearch.ResponseAnalyze(request, resp, rtt)
+	}
+
+	if diffClient != nil {
+		o.diffReporter.ResponseAnalyze(diffClient, request, resp, rtt, err)
 	}
 }
 
