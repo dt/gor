@@ -92,6 +92,10 @@ func init() {
 
 	flag.StringVar(&Settings.outputHTTPConfig.elasticSearch, "output-http-elasticsearch", "", "Send request and response stats to ElasticSearch:\n\tgor --input-raw :8080 --output-http staging.com --output-http-elasticsearch 'es_host:api_port/index_name'")
 
+	flag.StringVar(&Settings.outputHTTPConfig.diffHost, "output-http-diffhost", "", "Also send requests to 'diffhost' and compare responses and response times:\n\tgor --input-raw :8080 --output-http instanceA:9000 --output-http-diffhost instanceB:9000")
+	flag.StringVar(&Settings.outputHTTPConfig.diffRequestsFile, "diffs-record-requests", "", "Filename to which to write requests that generated diffs.")
+	flag.BoolVar(&Settings.outputHTTPConfig.diffIgnoreErrors, "diffs-ignore-errors", false, "Ignore diffs when one of the responses was an error")
+
 	flag.Var(&Settings.modifierConfig.headers, "http-set-header", "Inject additional headers to http reqest:\n\tgor --input-raw :8080 --output-http staging.com --http-set-header 'User-Agent: Gor'")
 	flag.Var(&Settings.modifierConfig.headers, "output-http-header", "WARNING: `--output-http-header` DEPRECATED, use `--http-set-header` instead")
 

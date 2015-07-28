@@ -104,20 +104,12 @@ func (p *ESPlugin) ErrorHandler() {
 	}
 }
 
-func (p *ESPlugin) RttDurationToMs(d time.Duration) int64 {
-	sec := d / time.Second
-	nsec := d % time.Second
-	fl := float64(sec) + float64(nsec)*1e-6
-	return int64(fl)
-}
-
-func (p *ESPlugin) ResponseAnalyze(req, resp []byte, start, stop time.Time) {
+func (p *ESPlugin) ResponseAnalyze(req, resp []byte, rtt int64) {
 	if len(resp) == 0 {
 		// nil http response - skipped elasticsearch export for this request
 		return
 	}
 	t := time.Now()
-	rtt := p.RttDurationToMs(stop.Sub(start))
 
 	esResp := ESRequestResponse{
 		ReqUrl:               proto.Path(req),
