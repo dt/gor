@@ -1,10 +1,47 @@
 package main
 
 import (
+	"github.com/cyberdelia/go-metrics-graphite"
+	"github.com/rcrowley/go-metrics"
 	"log"
+	"net"
+	"os"
 	"strconv"
 	"time"
 )
+
+var GorMetrics GorMetricsTracker
+
+type GorMetricsTracker struct {
+	registry metrics.Registry
+}
+
+func (t *GorMetricsTracker) Gauge(name string, value int) {
+	metrics.GetOrRegisterGauge(name, t.registry).Update(int64(value))
+}
+
+func (t *GorMetricsTracker) Inc(stat string) {
+	metrics.GetOrRegisterCounter(stat, t.registry).Inc(1)
+}
+
+func (t *GorMetricsTracker) Timing(stat string, d time.Duration) {
+	metrics.GetOrRegisterTimer(stat, t.registry).Update(d)
+}
+
+func InitMetricsManager() {
+	GorMetrics.registry = metrics.NewRegistry()
+
+	if Settings.graphite != "" {
+		log.Println("Stats reporting to graphite: ", Settings.graphite)
+		addr, _ := net.ResolveTCPAddr("tcp", Settings.graphite)
+		go graphite.Graphite(GorMetrics.registry, time.Second*5, Settings.graphitePrefix, addr)
+	}
+
+	if Settings.stats {
+		log.Println("Stats reporting enabled...")
+		go metrics.Log(GorMetrics.registry, time.Minute, log.New(os.Stderr, "metrics: ", log.Lmicroseconds))
+	}
+}
 
 const (
 	rate = 5

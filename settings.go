@@ -50,6 +50,9 @@ type AppSettings struct {
 
 	outputHTTPConfig HTTPOutputConfig
 	modifierConfig   HTTPModifierConfig
+
+	graphite       string
+	graphitePrefix string
 }
 
 // Settings holds Gor configuration
@@ -67,6 +70,8 @@ func init() {
 	flag.BoolVar(&Settings.verbose, "verbose", false, "Turn on more verbose output")
 	flag.BoolVar(&Settings.debug, "debug", false, "Turn on debug output, shows all itercepted traffic. Works only when with `verbose` flag")
 	flag.BoolVar(&Settings.stats, "stats", false, "Turn on queue stats output")
+	flag.StringVar(&Settings.graphite, "stats-graphite", "", "Address of a graphite server to which gathered metrics should be sent")
+	flag.StringVar(&Settings.graphitePrefix, "stats-graphite-prefix", "gor", "prefix for graphite metrics")
 
 	flag.BoolVar(&Settings.splitOutput, "split-output", false, "By default each output gets same traffic. If set to `true` it splits traffic equally among all outputs.")
 
