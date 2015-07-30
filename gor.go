@@ -37,6 +37,7 @@ func main() {
 	fmt.Println("Version:", VERSION)
 
 	flag.Parse()
+	InitMetricsManager()
 	InitPlugins()
 
 	if len(Plugins.Inputs) == 0 || len(Plugins.Outputs) == 0 {

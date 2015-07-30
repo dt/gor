@@ -54,6 +54,7 @@ func NewHTTPOutput(address string, config *HTTPOutputConfig) io.Writer {
 
 	if o.config.stats {
 		o.queueStats = NewGorStat("output_http")
+		GorMetrics.Gauge("output_http", len(o.queue))
 	}
 
 	o.queue = make(chan []byte, 100)
