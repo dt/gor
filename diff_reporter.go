@@ -72,7 +72,7 @@ func (d *DiffReporter) ResponseAnalyze(client *HTTPClient, req, respA []byte, rt
 		return
 	}
 
-	if bytes.Equal(respA, respB) {
+	if bytes.Equal(respA[proto.MIMEHeadersEndPos(respA):], respB[proto.MIMEHeadersEndPos(respB):]) {
 		GorMetrics.Inc("diffing.match")
 		return
 	}
@@ -97,7 +97,7 @@ func (d *DiffReporter) ResponseAnalyze(client *HTTPClient, req, respA []byte, rt
 		sizeA-sizeB,
 		DurationToMs(rttA),
 		DurationToMs(rttB),
-		rttA-rttB,
+		DurationToMs(rttA-rttB),
 	)
 
 	if d.requestsWriter != nil {
