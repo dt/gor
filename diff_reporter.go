@@ -40,54 +40,64 @@ func (d *DiffReporter) writeDiffs() {
 	}
 }
 
-func (d *DiffReporter) ResponseAnalyze(client *HTTPClient, req, resp []byte, rtt int64, err error) {
-	// Bail early if ignoring errors and original response is an error.
-	if d.ignoreErrors && err != nil {
-		return
-	}
+func isErr(err error, resp []byte) bool {
+	return err != nil || proto.Status(resp)[0] == '5'
+}
+
+func (d *DiffReporter) ResponseAnalyze(client *HTTPClient, req, respA []byte, rttA time.Duration, rawErrA error) {
+
+	GorMetrics.Inc("diffing.total")
 
 	start := time.Now()
-	diffResp, diffErr := client.Send(req)
+	respB, rawErrB := client.Send(req)
 	stop := time.Now()
+	rttB := stop.Sub(start)
 
-	if err != nil && diffErr != nil {
+	errA := isErr(rawErrA, respA)
+	errB := isErr(rawErrB, respB)
+
+	if errA {
+		GorMetrics.Inc("diffing.err.a")
+	} else {
+		GorMetrics.Timing("diffing.rtt.a", rttA)
+	}
+
+	if errB {
+		GorMetrics.Inc("diffing.err.b")
+	} else {
+		GorMetrics.Timing("diffing.rtt.b", rttB)
+	}
+
+	if (errA && errB) || (d.ignoreErrors && (errA || errB)) {
 		return
 	}
 
-	if bytes.Equal(resp, diffResp) {
+	if bytes.Equal(respA, respB) {
+		GorMetrics.Inc("diffing.match")
 		return
 	}
 
-	if diffErr != nil {
-		if d.ignoreErrors {
-			return
-		} else {
-			log.Println("[DIFF] diffhost error:\n", diffErr)
-		}
-	}
-
-	diffRtt := RttDurationToMs(stop.Sub(start))
+	GorMetrics.Inc("diffing.diff")
 
 	atomic.AddInt64(&d.totalDiffs, 1)
 
 	diffNum := atomic.LoadInt64(&d.totalDiffs)
 
-	// TODO(davidt): Log to file, track p99, etc
-	respSize := len(resp)
-	diffSize := len(diffResp)
+	sizeA := len(respA)
+	sizeB := len(respB)
 
 	log.Printf("[DIFF %d] %s %s status: %s v %s size: %d v %d (%d) time: %dms vs %dms (%d)",
 		diffNum,
 		proto.Method(req),
 		proto.Path(req),
-		proto.Status(resp),
-		proto.Status(diffResp),
-		respSize,
-		diffSize,
-		respSize-diffSize,
-		rtt,
-		diffRtt,
-		rtt-diffRtt,
+		proto.Status(respA),
+		proto.Status(respB),
+		sizeA,
+		sizeB,
+		sizeA-sizeB,
+		DurationToMs(rttA),
+		DurationToMs(rttB),
+		rttA-rttB,
 	)
 
 	if d.requestsWriter != nil {

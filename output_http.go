@@ -169,14 +169,14 @@ func (o *HTTPOutput) sendRequest(client *HTTPClient, request []byte, diffClient 
 	start := time.Now()
 	resp, err := client.Send(request)
 	stop := time.Now()
-	rtt := RttDurationToMs(stop.Sub(start))
+	rtt := stop.Sub(start)
 
 	if err != nil {
 		log.Println("Request error:", err)
 	}
 
 	if o.elasticSearch != nil {
-		o.elasticSearch.ResponseAnalyze(request, resp, rtt)
+		o.elasticSearch.ResponseAnalyze(request, resp, DurationToMs(rtt))
 	}
 
 	if diffClient != nil {

@@ -1,10 +1,32 @@
 package main
 
 import (
+	"github.com/rcrowley/go-metrics"
 	"log"
 	"strconv"
 	"time"
 )
+
+type MetricsConfig struct {
+}
+
+var GorMetrics GorMetricsTracker
+
+type GorMetricsTracker struct {
+	registry metrics.Registry
+}
+
+func (t *GorMetricsTracker) Inc(stat string) {
+	metrics.GetOrRegisterCounter(stat, t.registry).Inc(1)
+}
+
+func (t *GorMetricsTracker) Timing(stat string, d time.Duration) {
+	metrics.GetOrRegisterTimer(stat, t.registry).Update(d)
+}
+
+func InitMetricsManager(c *MetricsConfig) {
+	GorMetrics.registry = metrics.NewRegistry()
+}
 
 const (
 	rate = 5
